@@ -8,112 +8,117 @@ RIMWORLD_FOLDER = "C:\\Applications\\RimWorld"
 
 
 # Classes
-class PlantBaseNonEdible:
+class plantsEntry:
     def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 0
-        self.lifespanDaysPerGrowDays = 0
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 1
-        self.sowWork = 170
-        self.sowMinSkill = 0
-        self.harvestWork = 200
-        self.harvestedThingDef = "undefined"
+        # Base stats
+        self.parent = ""
+        self.name = ""
+        self.harvestNutrition = 0
+        self.lifespanDaysPerGrowDays = ""
+        self.fertilityMin = 0
+        self.fertilitySensitivity = 0
+        self.sowWork = ""
+        self.sowMinSkill = ""
+        self.harvestWork = ""
+        self.harvestedThingDef = ""
         self.harvestYield = 0
-        self.hydroponic = False
+        self.hydroponic = ""
         self.growDays = 0
+        # Derived stats
+        self.daytimeGrowDays = ""
+        self.yieldSand = ""
+        self.yieldDirt = ""
+        self.yieldSoil = ""
+        self.yieldRich = ""
+        self.yieldHydroponics = ""
+        self.yieldEcosystem = ""
+        # Nutrition per day
+        self.nutritionYieldSand = ""
+        self.nutritionYieldDirt = ""
+        self.nutritionYieldSoil = ""
+        self.nutritionYieldRich = ""
+        self.nutritionYieldHydroponics = ""
+        self.nutritionYieldEcosystem = ""
 
 
-class PlantBase:
-    def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 0
-        self.lifespanDaysPerGrowDays = 0
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 1
-        self.sowWork = 170
-        self.sowMinSkill = 0
-        self.harvestWork = 200
-        self.harvestedThingDef = "undefined"
-        self.harvestYield = 0
-        self.hydroponic = False
-        self.growDays = 0
+def scanFiles(rimworldFolderPath):
+    XMLFilePathList = []
+    defIndex = {}
+    # Excludes older versions
+    excludedKeywords = ["1.0", "1.1", "1.2", "1.3", "1.4"]
+    # Exports every single xml into a single variable
+    for XMLFilePath in Path(rimworldFolderPath).rglob("**/*.xml"):
+        if not any(keyword in str(XMLFilePath) for keyword in excludedKeywords):
+            XMLFilePathList.append(XMLFilePath)
+            try:
+                tree = ET.parse(XMLFilePath)
+                root = tree.getroot()
+                for element1 in root:
+                    for element2 in element1:
+                        if element2.tag == "defName":
+                            defIndex[element2.text] = XMLFilePath
+            except Exception:
+                pass
+    return (XMLFilePathList, defIndex)
 
 
-class BushBase:
-    def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 0.5
-        self.lifespanDaysPerGrowDays = 0
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 0.5
-        self.sowWork = 170
-        self.sowMinSkill = 0
-        self.harvestWork = 200
-        self.harvestedThingDef = "undefined"
-        self.harvestYield = 0
-        self.hydroponic = False
-        self.growDays = 3
+# Figures out harvest nutrition from a harvestable's def
+def getHarvestableNutrition(defIndex, harvestableDef):
+    harvestNutrition = 0
+    ingestible = False
+    harvestNutritionSpecified = False
+    tree = ET.parse(defIndex[harvestableDef])
+    root = tree.getroot()
+    for element1 in root:  # ThingDef
+        for element2 in element1:  # e.g defName, statBase
+            if element2.text == harvestableDef:
+                for element2 in element1:  # e.g defName, statBase
+                    match element2.tag:
+                        case "statBases":
+                            for element3 in element2:
+                                if element3.tag == "Nutrition":
+                                    harvestNutrition = element3.text
+                                    harvestNutritionSpecified = True
+                        case "ingestible":
+                            ingestible = True
+    harvestNutrition = (
+        0.05 if ingestible and not harvestNutritionSpecified else harvestNutrition
+    )
+    return harvestNutrition
 
 
-class TreeBase:
-    def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 2
-        self.lifespanDaysPerGrowDays = 9
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 0.5
-        self.sowWork = 4000
-        self.sowMinSkill = 6
-        self.harvestWork = 800
-        self.harvestedThingDef = "undefined"
-        self.harvestYield = 25
-        self.hydroponic = False
-        self.growDays = 0
+def yieldCalculator(entry, type, soil):
+    soilFertility = 0
+    match soil:
+        case "sand":
+            soilFertility = 0.1
+        case "dirt":
+            soilFertility = 0.7
+        case "soil":
+            soilFertility = 1
+        case "rich":
+            soilFertility = 1.4
+        case "hydroponics":
+            soilFertility = 2.8
+        case "ecosystem":
+            soilFertility = 3.5
+
+    fertileGrowth = float(entry.fertilitySensitivity) * soilFertility
+    infertileGrowth = 1 - float(entry.fertilitySensitivity)
+    growthRate = fertileGrowth + infertileGrowth
+
+    match type:
+        case "base":
+            return float(entry.harvestYield) * growthRate
+        case "nutrition":
+            return (
+                float(entry.harvestYield) * float(entry.harvestNutrition) * growthRate
+            )
 
 
-class DeciduousTreeBase:
-    def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 2
-        self.lifespanDaysPerGrowDays = 9
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 0.5
-        self.sowWork = 4000
-        self.sowMinSkill = 6
-        self.harvestWork = 800
-        self.harvestedThingDef = "undefined"
-        self.harvestYield = 25
-        self.hydroponic = False
-        self.growDays = 0
-
-
-class CavePlantBase:
-    def __init__(self):
-        self.parent = "undefined"
-        self.name = "undefinedPlant"
-        self.nutrition = 0
-        self.lifespanDaysPerGrowDays = 0
-        self.fertilityMin = 0.7
-        self.fertilitySensitivity = 1
-        self.sowWork = 170
-        self.sowMinSkill = 0
-        self.harvestWork = 200
-        self.harvestedThingDef = "undefined"
-        self.harvestYield = 0
-        self.hydroponic = False
-        self.growDays = 0
-
-
-# Process defs
-def extractDef(defFilePath, sheets):
+# Extracts defs
+def extractDef(defFilePath, defIndex, sheets):
     sheetName = "undefined"
-    entry = "undefined"
 
     try:
         tree = ET.parse(defFilePath)
@@ -129,32 +134,7 @@ def extractDef(defFilePath, sheets):
     match sheetName:
         case "plants":
             for element1 in root:  # ThingDef
-                try:
-                    parentName = element1.attrib["ParentName"]
-                except Exception:
-                    break
-                match parentName:
-                    case "PlantBaseNonEdible":
-                        entry = PlantBaseNonEdible()
-                    case "PlantBase":
-                        entry = PlantBase()
-                    case "BushBase":
-                        entry = BushBase()
-                    case "TreeBase":
-                        entry = TreeBase()
-                    case "DeciduousTreeBase":
-                        entry = DeciduousTreeBase()
-                    case "CavePlantBase":
-                        entry = CavePlantBase()
-                    case "VEE_Flower":
-                        entry = VEE_Flower()
-                    case "StumpChoppedBase":
-                        break
-                    case "StumpSmashedBase":
-                        break
-                    case _:
-                        print("Missing plant base:" + parentName)
-
+                entry = plantsEntry()
                 for element2 in element1:  # e.g label
                     match element2.tag:
                         case "label":
@@ -166,27 +146,44 @@ def extractDef(defFilePath, sheets):
                                         entry.fertilitySensitivity = element3.text
                                     case "harvestedThingDef":
                                         entry.harvestedThingDef = element3.text
+                                        entry.harvestNutrition = (
+                                            getHarvestableNutrition(
+                                                defIndex, element3.text
+                                            )
+                                        )
                                     case "harvestYield":
                                         entry.harvestYield = element3.text
                                     case "sowTags":
                                         for element4 in element3:
                                             match element4.text:
-                                                case "hydroponic":
+                                                case "Hydroponic":
                                                     entry.hydroponic = True
                                     case "growDays":
                                         entry.growDays = element3.text
+                # Derived stats
+                entry.daytimeGrowDays = float(entry.growDays) / (13 / 24)
+                entry.yieldSand = yieldCalculator(entry, "base", "sand")
+                entry.yieldDirt = yieldCalculator(entry, "base", "dirt")
+                entry.yieldSoil = yieldCalculator(entry, "base", "soil")
+                entry.yieldRich = yieldCalculator(entry, "base", "rich")
+                entry.yieldHydroponics = yieldCalculator(entry, "base", "hydroponics")
+                entry.yieldEcosystem = yieldCalculator(entry, "base", "ecosystem")
+                entry.nutritionYieldSand = yieldCalculator(entry, "nutrition", "sand")
+                entry.nutritionYieldDirt = yieldCalculator(entry, "nutrition", "dirt")
+                entry.nutritionYieldSoil = yieldCalculator(entry, "nutrition", "soil")
+                entry.nutritionYieldRich = yieldCalculator(entry, "nutrition", "rich")
+                entry.nutritionYieldHydroponics = yieldCalculator(
+                    entry, "nutrition", "hydroponics"
+                )
+                entry.nutritionYieldEcosystem = yieldCalculator(
+                    entry, "nutrition", "ecosystem"
+                )
                 sheets[sheetName].append(entry)
 
 
-# Returns a list with every def path
-def getXMLFilePaths():
-    # Returns the filelist
-    XMLFilePaths = []
-    excludedKeywords = ["1.0", "1.1", "1.2", "1.3", "1.4"]
-    for XMLFile in Path(RIMWORLD_FOLDER).rglob("**/*.xml"):
-        if not any(keyword in str(XMLFile) for keyword in excludedKeywords):
-            XMLFilePaths.append(XMLFile)
-    return XMLFilePaths
+# Processes defs
+def processDefs(sheet, sheets):
+    pass
 
 
 # Defines variables for each sheet
@@ -201,36 +198,70 @@ sheets = {
 
 # Code execution starts here
 if __name__ == "__main__":
-    # Get a list with every def path
-    XMLFilePathList = getXMLFilePaths()
+    # Get XML and def
+    XMLFilePathList, defIndex = scanFiles(RIMWORLD_FOLDER)
+    # print(defIndex)
 
     # Extract every def
     for XMLFilePath in XMLFilePathList:
-        extractDef(XMLFilePath, sheets)
+        extractDef(XMLFilePath, defIndex, sheets)
 
-    # Write the CSVs
     for sheetName in sheets.keys():
         sheet = sheets[sheetName]
+        # Process defs to get more info
+        processDefs(sheet, sheets)
+
+        # Write the CSVs
         with open(sheetName + ".csv", "w", newline="", encoding="utf-8") as csvf:
             writer = csv.writer(csvf)
             writer.writerow(
                 [
-                    "Parent",
                     "Name",
+                    "Harvest Nutrition",
+                    "Fertility min",
                     "Fertility Sensitivity",
                     "Harvest Yield",
                     "Hydroponic",
                     "Grow Days",
+                    "Daytime Grow Days",
+                    # Yield per day
+                    "yieldSand",
+                    "yieldDirt",
+                    "yieldSoil",
+                    "yieldRich",
+                    "yieldHydroponics",
+                    "yieldEcosystem",
+                    # Nutrition per day
+                    "nutritionYieldSand",
+                    "nutritionYieldDirt",
+                    "nutritionYieldSoil",
+                    "nutritionYieldRich",
+                    "nutritionYieldHydroponics",
+                    "nutritionYieldEcosystem",
                 ]
             )
             for entry in sheet:
                 writer.writerow(
                     [
-                        entry.parent,
                         entry.name,
+                        entry.harvestNutrition,
+                        entry.fertilityMin,
                         entry.fertilitySensitivity,
                         entry.harvestYield,
                         entry.hydroponic,
                         entry.growDays,
+                        entry.daytimeGrowDays,
+                        entry.yieldSand,
+                        entry.yieldDirt,
+                        entry.yieldSoil,
+                        entry.yieldRich,
+                        entry.yieldHydroponics,
+                        entry.yieldEcosystem,
+                        entry.nutritionYieldSand,
+                        entry.nutritionYieldDirt,
+                        entry.nutritionYieldSoil,
+                        entry.nutritionYieldRich,
+                        entry.nutritionYieldHydroponics,
+                        entry.nutritionYieldEcosystem,
                     ]
                 )
